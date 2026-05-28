@@ -103,6 +103,8 @@ export async function POST(req: Request) {
       managerId: existing.manager.id,
       position: existing.manager.position,
       dealLink,
+      assignedAt: existing.assignedAt,
+      assignedDate: existing.date,
       existing: true,
     });
   }

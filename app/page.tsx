@@ -94,10 +94,22 @@ export default function Home() {
           text: data.error ?? "Не удалось обработать сделку",
         });
       } else if (data.existing) {
+        const assignedDate = data.assignedDate
+          ? new Date(data.assignedDate).toISOString().split("T")[0]
+          : null;
+        const isToday = assignedDate === today;
+        const dateLabel = assignedDate
+          ? new Date(assignedDate).toLocaleDateString("ru-RU", {
+              day: "numeric",
+              month: "long",
+            })
+          : null;
         setDealResult({
           type: "existing",
           title: "Уже есть",
-          text: `Сделка уже была назначена на ${data.manager}`,
+          text: isToday
+            ? `Сделка уже была назначена на ${data.manager}`
+            : `Сделка уже была назначена на ${data.manager} (${dateLabel})`,
         });
       } else {
         setDealResult({
