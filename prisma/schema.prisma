@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  MANAGER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(USER)
+  managerId String?
+  manager   Manager? @relation(fields: [managerId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Manager {
+  id        String       @id @default(cuid())
+  name      String
+  position  Int          @unique
+  isActive  Boolean      @default(true)
+  users     User[]
+  quotas    DailyQuota[]
+  deals     Deal[]
+  createdAt DateTime     @default(now())
+}
+
+model DailyQuota {
+  id        String   @id @default(cuid())
+  managerId String
+  manager   Manager  @relation(fields: [managerId], references: [id])
+  date      DateTime @db.Date
+  quota     Int      @default(0)
+
+  @@unique([managerId, date])
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  dealLink    String   @unique
+  managerId   String
+  manager     Manager  @relation(fields: [managerId], references: [id])
+  assignedAt  DateTime @default(now())
+  date        DateTime @db.Date
+}
