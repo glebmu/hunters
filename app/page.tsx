@@ -22,6 +22,8 @@ type DealResult = {
   type: "new" | "existing" | "error";
 };
 
+type Role = "manager" | "user";
+
 const AMO_BASE = "https://zhe.amocrm.ru/leads/detail/";
 
 /** Extract numeric deal ID from any input format, then build canonical URL.
@@ -43,6 +45,10 @@ function normalizeDealLink(input: string): string {
 }
 
 export default function Home() {
+  const [role, setRole] = useState<Role | null>(null);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState(false);
+
   const [managers, setManagers] = useState<Manager[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -168,6 +174,52 @@ export default function Home() {
     error: "bg-red-50 border-red-200 text-red-700",
   };
 
+  function submitCode() {
+    const code = codeInput.trim().toLowerCase();
+    if (code === "manager") {
+      setRole("manager");
+    } else if (code.length > 0) {
+      setRole("user");
+    } else {
+      setCodeError(true);
+    }
+  }
+
+  // ── Gate screen ──────────────────────────────────────────────
+  if (!role) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-sm p-8">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Распределение сделок</h1>
+          <p className="text-sm text-gray-500 mb-6">Введите кодовое слово для входа</p>
+          <div className="flex flex-col gap-3">
+            <input
+              type="password"
+              placeholder="Кодовое слово"
+              value={codeInput}
+              autoFocus
+              onChange={(e) => { setCodeInput(e.target.value); setCodeError(false); }}
+              onKeyDown={(e) => e.key === "Enter" && submitCode()}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                codeError ? "border-red-400" : "border-gray-300"
+              }`}
+            />
+            {codeError && (
+              <p className="text-xs text-red-500">Введите кодовое слово</p>
+            )}
+            <button
+              onClick={submitCode}
+              className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              Войти
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // ─────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -276,16 +328,20 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="number"
-                          min={0}
-                          max={20}
-                          value={quota}
-                          onChange={(e) =>
-                            updateQuota(m.id, parseInt(e.target.value) || 0)
-                          }
-                          className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        {role === "manager" ? (
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={quota}
+                            onChange={(e) =>
+                              updateQuota(m.id, parseInt(e.target.value) || 0)
+                            }
+                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        ) : (
+                          <span className="text-sm font-medium text-gray-700">{quota || "—"}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         {dealsCount > 0 ? (
@@ -315,28 +371,30 @@ export default function Home() {
             )}
           </div>
 
-          {/* Add manager */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <h2 className="text-sm font-medium text-gray-700 mb-3">
-              Добавить менеджера
-            </h2>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Фамилия Имя"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addManager()}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={addManager}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-              >
-                Добавить
-              </button>
+          {/* Add manager — managers only */}
+          {role === "manager" && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-700 mb-3">
+                Добавить менеджера
+              </h2>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Фамилия Имя"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addManager()}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={addManager}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Добавить
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </main>
