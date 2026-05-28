@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const dateParam = searchParams.get("date");
+  const date = dateParam
+    ? new Date(dateParam)
+    : new Date(new Date().toDateString());
+
   const managers = await prisma.manager.findMany({
     orderBy: { position: "asc" },
     include: {
-      quotas: {
-        where: { date: new Date(new Date().toDateString()) },
-      },
-      deals: {
-        where: { date: new Date(new Date().toDateString()) },
-      },
+      quotas: { where: { date } },
+      deals: { where: { date } },
     },
   });
   return NextResponse.json(managers);
