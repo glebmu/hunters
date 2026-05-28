@@ -24,10 +24,21 @@ type DealResult = {
 
 const AMO_BASE = "https://zhe.amocrm.ru/leads/detail/";
 
+/** Extract numeric deal ID from any input format, then build canonical URL.
+ *  Handles: "32529726", "#32529726", full URL, URL with query params, etc.
+ */
 function normalizeDealLink(input: string): string {
   const trimmed = input.trim();
-  // Pure number → construct full URL
-  if (/^\d+$/.test(trimmed)) return AMO_BASE + trimmed;
+
+  // 1. Try to extract ID from a URL path: /leads/detail/NNNNN
+  const pathMatch = trimmed.match(/\/leads\/detail\/(\d+)/);
+  if (pathMatch) return AMO_BASE + pathMatch[1];
+
+  // 2. Strip leading non-digit characters (#, spaces, etc.) and take the number
+  const numberMatch = trimmed.match(/(\d+)/);
+  if (numberMatch) return AMO_BASE + numberMatch[1];
+
+  // 3. Fallback: use as-is
   return trimmed;
 }
 
