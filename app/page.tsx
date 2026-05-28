@@ -16,12 +16,32 @@ type Deal = {
   assignedAt: string;
 };
 
+type DealResult = {
+  title: string;
+  text: string;
+  type: "new" | "existing" | "error";
+};
+
+const AMO_BASE = "https://zhe.amocrm.ru/leads/detail/";
+
+function normalizeDealLink(input: string): string {
+  const trimmed = input.trim();
+  // Pure number → construct full URL
+  if (/^\d+$/.test(trimmed)) return AMO_BASE + trimmed;
+  return trimmed;
+}
+
 export default function Home() {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ manager: Manager; deals: Deal[] } | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+
+  const [dealInput, setDealInput] = useState("");
+  const [dealResult, setDealResult] = useState<DealResult | null>(null);
+  const [processing, setProcessing] = useState(false);
+
   const today = new Date().toISOString().split("T")[0];
 
   const fetchManagers = useCallback(async () => {
@@ -34,7 +54,6 @@ export default function Home() {
     fetchManagers();
   }, [fetchManagers]);
 
-  // Close modal on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") setModal(null);
@@ -42,6 +61,48 @@ export default function Home() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  async function processDeal() {
+    if (!dealInput.trim() || processing) return;
+    const dealLink = normalizeDealLink(dealInput);
+    setProcessing(true);
+    setDealResult(null);
+
+    try {
+      const res = await fetch("/api/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deal_link: dealLink }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setDealResult({
+          type: "error",
+          title: "Ошибка",
+          text: data.error ?? "Не удалось обработать сделку",
+        });
+      } else if (data.existing) {
+        setDealResult({
+          type: "existing",
+          title: "Уже есть",
+          text: `Сделка уже была назначена на ${data.manager}`,
+        });
+      } else {
+        setDealResult({
+          type: "new",
+          title: "Сделка добавлена",
+          text: `На сделку назначен менеджер ${data.manager}`,
+        });
+        setDealInput("");
+        fetchManagers();
+      }
+    } catch {
+      setDealResult({ type: "error", title: "Ошибка", text: "Нет связи с сервером" });
+    } finally {
+      setProcessing(false);
+    }
+  }
 
   async function openDeals(manager: Manager) {
     if (manager.deals.length === 0) return;
@@ -78,6 +139,12 @@ export default function Home() {
     return match ? `Сделка #${match[1]}` : link;
   }
 
+  const resultColors = {
+    new: "bg-green-50 border-green-200 text-green-800",
+    existing: "bg-amber-50 border-amber-200 text-amber-800",
+    error: "bg-red-50 border-red-200 text-red-700",
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -90,8 +157,36 @@ export default function Home() {
     <>
       <main className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Распределение сделок</h1>
-          <p className="text-sm text-gray-500 mb-8">
+
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 shrink-0">
+              Распределение сделок
+            </h1>
+            <div className="flex items-center gap-2 flex-1 max-w-sm">
+              <input
+                type="text"
+                placeholder="ID или ссылка на сделку"
+                value={dealInput}
+                onChange={(e) => {
+                  setDealInput(e.target.value);
+                  setDealResult(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && processDeal()}
+                className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={processDeal}
+                disabled={!dealInput.trim() || processing}
+                className="shrink-0 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {processing ? "..." : "Обработать"}
+              </button>
+            </div>
+          </div>
+
+          {/* Date */}
+          <p className="text-sm text-gray-500 mb-4">
             {new Date().toLocaleDateString("ru-RU", {
               weekday: "long",
               year: "numeric",
@@ -100,6 +195,27 @@ export default function Home() {
             })}
           </p>
 
+          {/* Result notification */}
+          {dealResult && (
+            <div
+              className={`flex items-start justify-between gap-3 border rounded-xl px-4 py-3 mb-5 ${resultColors[dealResult.type]}`}
+            >
+              <div>
+                <p className="text-sm font-semibold">{dealResult.title}</p>
+                <p className="text-sm mt-0.5">{dealResult.text}</p>
+              </div>
+              <button
+                onClick={() => setDealResult(null)}
+                className="mt-0.5 opacity-60 hover:opacity-100 transition-opacity shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Managers table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -176,6 +292,7 @@ export default function Home() {
             )}
           </div>
 
+          {/* Add manager */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <h2 className="text-sm font-medium text-gray-700 mb-3">
               Добавить менеджера
@@ -197,10 +314,11 @@ export default function Home() {
               </button>
             </div>
           </div>
+
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Deals modal */}
       {modal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
@@ -210,15 +328,12 @@ export default function Home() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">
                   {modal.manager.name}
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Сделки на сегодня
-                </p>
+                <p className="text-xs text-gray-500 mt-0.5">Сделки на сегодня</p>
               </div>
               <button
                 onClick={() => setModal(null)}
@@ -230,16 +345,13 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="overflow-y-auto flex-1 px-6 py-4">
               {modalLoading ? (
                 <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
                   Загрузка...
                 </div>
               ) : modal.deals.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  Нет сделок
-                </div>
+                <div className="text-center py-8 text-gray-400 text-sm">Нет сделок</div>
               ) : (
                 <ol className="space-y-3">
                   {modal.deals.map((deal, i) => (
@@ -261,7 +373,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Footer */}
             {!modalLoading && modal.deals.length > 0 && (
               <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400">
                 Всего сделок: {modal.deals.length}
