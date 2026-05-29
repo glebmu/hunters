@@ -88,6 +88,10 @@ export default function Home() {
   // ── Plan next day ──────────────────────────────────────────
   const [copying, setCopying] = useState(false);
 
+  // ── Sync from Google Sheets ────────────────────────────────
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
   const fetchManagers = useCallback(async (date: string) => {
     setLoading(true);
     const res = await fetch(`/api/managers?date=${date}`);
@@ -109,6 +113,32 @@ export default function Home() {
     if (code === "manager") { setRole("manager"); }
     else if (code.length > 0) { setRole("user"); }
     else { setCodeError(true); }
+  }
+
+  // ── Sync from Google Sheets ────────────────────────────────
+  async function syncFromSheet() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: selectedDate }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncMsg(`Ошибка: ${data.error ?? "не удалось обновить"}`);
+      } else {
+        const addedTxt = data.added > 0 ? `, добавлено ${data.added} менеджеров` : "";
+        setSyncMsg(`Обновлено${addedTxt}`);
+        fetchManagers(selectedDate);
+        setTimeout(() => setSyncMsg(null), 4000);
+      }
+    } catch {
+      setSyncMsg("Нет связи с сервером");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   // ── Plan next day ──────────────────────────────────────────
@@ -514,6 +544,33 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Floating sync button (managers only) ────────────── */}
+      {role === "manager" && (
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+          {syncMsg && (
+            <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-[200px] text-center">
+              {syncMsg}
+            </div>
+          )}
+          <button
+            onClick={syncFromSheet}
+            disabled={syncing}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-3 rounded-full shadow-lg transition-colors"
+          >
+            <svg
+              className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncing ? "Обновляю..." : "Обновить"}
+          </button>
         </div>
       )}
     </>
