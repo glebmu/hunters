@@ -460,7 +460,7 @@ export default function Home() {
                             value={m.monthlyPlan}
                             onChange={(e) => setLocalMonthlyPlan(m.id, parseInt(e.target.value) || 0)}
                             onBlur={(e) => saveMonthlyPlan(m.id, parseInt(e.target.value) || 0)}
-                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </td>
                       )}
@@ -478,7 +478,7 @@ export default function Home() {
                             value={quota}
                             onChange={(e) => setLocalQuota(m.id, parseInt(e.target.value) || 0)}
                             onBlur={(e) => saveQuota(m.id, parseInt(e.target.value) || 0)}
-                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         ) : (
                           <span className={`text-sm font-medium ${quota > 0 ? "text-gray-700" : "text-gray-300"}`}>
