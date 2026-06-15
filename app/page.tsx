@@ -6,6 +6,8 @@ type Manager = {
   id: string;
   name: string;
   position: number;
+  monthlyPlan: number;
+  monthDealsCount: number;
   quotas: { quota: number }[];
   deals: { id: string }[];
 };
@@ -208,13 +210,34 @@ export default function Home() {
     fetchManagers(selectedDate);
   }
 
-  async function updateQuota(managerId: string, quota: number) {
+  function setLocalQuota(managerId: string, quota: number) {
+    setManagers((prev) =>
+      prev.map((m) =>
+        m.id === managerId ? { ...m, quotas: [{ quota }] } : m
+      )
+    );
+  }
+
+  async function saveQuota(managerId: string, quota: number) {
     await fetch("/api/quotas", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ managerId, date: selectedDate, quota }),
     });
-    fetchManagers(selectedDate);
+  }
+
+  function setLocalMonthlyPlan(managerId: string, monthlyPlan: number) {
+    setManagers((prev) =>
+      prev.map((m) => (m.id === managerId ? { ...m, monthlyPlan } : m))
+    );
+  }
+
+  async function saveMonthlyPlan(managerId: string, monthlyPlan: number) {
+    await fetch("/api/managers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ managerId, monthlyPlan }),
+    });
   }
 
   async function openDeals(manager: Manager) {
@@ -400,6 +423,10 @@ export default function Home() {
                 <tr>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-8">#</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Менеджер</th>
+                  {role === "manager" && (
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">План/мес</th>
+                  )}
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Итого/мес</th>
                   <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {isFuture ? "Запланировано" : "Норма"}
                   </th>
@@ -424,6 +451,24 @@ export default function Home() {
                           )}
                         </div>
                       </td>
+                      {role === "manager" && (
+                        <td className="px-4 py-4 text-center">
+                          <input
+                            type="number"
+                            min={0}
+                            max={999}
+                            value={m.monthlyPlan}
+                            onChange={(e) => setLocalMonthlyPlan(m.id, parseInt(e.target.value) || 0)}
+                            onBlur={(e) => saveMonthlyPlan(m.id, parseInt(e.target.value) || 0)}
+                            className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-4 text-center">
+                        <span className={`text-sm font-medium ${m.monthDealsCount > 0 ? "text-gray-700" : "text-gray-300"}`}>
+                          {m.monthDealsCount || "—"}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-center">
                         {canEdit ? (
                           <input
@@ -431,7 +476,8 @@ export default function Home() {
                             min={0}
                             max={20}
                             value={quota}
-                            onChange={(e) => updateQuota(m.id, parseInt(e.target.value) || 0)}
+                            onChange={(e) => setLocalQuota(m.id, parseInt(e.target.value) || 0)}
+                            onBlur={(e) => saveQuota(m.id, parseInt(e.target.value) || 0)}
                             className="w-16 text-center border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         ) : (

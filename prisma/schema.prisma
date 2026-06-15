@@ -24,14 +24,15 @@ model User {
 }
 
 model Manager {
-  id        String       @id @default(cuid())
-  name      String
-  position  Int          @unique
-  isActive  Boolean      @default(true)
-  users     User[]
-  quotas    DailyQuota[]
-  deals     Deal[]
-  createdAt DateTime     @default(now())
+  id          String       @id @default(cuid())
+  name        String
+  position    Int          @unique
+  isActive    Boolean      @default(true)
+  monthlyPlan Int          @default(0)
+  users       User[]
+  quotas      DailyQuota[]
+  deals       Deal[]
+  createdAt   DateTime     @default(now())
 }
 
 model DailyQuota {
