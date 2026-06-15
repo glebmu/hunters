@@ -52,3 +52,13 @@ export async function PATCH(req: Request) {
   });
   return NextResponse.json(manager);
 }
+
+export async function PUT(req: Request) {
+  const { ids } = await req.json() as { ids: string[] };
+  await Promise.all(
+    ids.map((id, i) =>
+      prisma.manager.update({ where: { id }, data: { position: i + 1 } })
+    )
+  );
+  return NextResponse.json({ ok: true });
+}

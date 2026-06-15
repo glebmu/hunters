@@ -90,6 +90,10 @@ export default function Home() {
   // ── Plan next day ──────────────────────────────────────────
   const [copying, setCopying] = useState(false);
 
+  // ── Drag-and-drop reorder ──────────────────────────────────
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   // ── Sync from Google Sheets ────────────────────────────────
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -240,6 +244,37 @@ export default function Home() {
     });
   }
 
+  function handleDragStart(e: React.DragEvent, id: string) {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    if (id !== draggedId) setDragOverId(id);
+  }
+
+  async function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetId) { setDraggedId(null); setDragOverId(null); return; }
+
+    const newOrder = [...managers];
+    const fromIdx = newOrder.findIndex((m) => m.id === draggedId);
+    const toIdx = newOrder.findIndex((m) => m.id === targetId);
+    const [moved] = newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, moved);
+
+    setManagers(newOrder.map((m, i) => ({ ...m, position: i + 1 })));
+    setDraggedId(null);
+    setDragOverId(null);
+
+    await fetch("/api/managers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: newOrder.map((m) => m.id) }),
+    });
+  }
+
   async function openDeals(manager: Manager) {
     if (manager.deals.length === 0) return;
     setModalLoading(true);
@@ -320,7 +355,7 @@ export default function Home() {
                   disabled={!dealInput.trim() || processing}
                   className="shrink-0 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {processing ? "..." : "Обработать"}
+                  {processing ? "..." : "Добавить"}
                 </button>
               </div>
             </div>
@@ -421,6 +456,7 @@ export default function Home() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  {role === "manager" && <th className="w-6 px-2 py-3" />}
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-8">#</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Менеджер</th>
                   {role === "manager" && (
@@ -441,7 +477,26 @@ export default function Home() {
                   const dealsCount = m.deals.length;
                   const isActive = isToday && quota > 0 && dealsCount < quota;
                   return (
-                    <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={m.id}
+                      draggable={role === "manager"}
+                      onDragStart={role === "manager" ? (e) => handleDragStart(e, m.id) : undefined}
+                      onDragOver={role === "manager" ? (e) => handleDragOver(e, m.id) : undefined}
+                      onDrop={role === "manager" ? (e) => handleDrop(e, m.id) : undefined}
+                      onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+                      className={`transition-colors ${
+                        draggedId === m.id ? "opacity-40" :
+                        dragOverId === m.id ? "bg-blue-50 border-t-2 border-blue-400" :
+                        "hover:bg-gray-50"
+                      }`}
+                    >
+                      {role === "manager" && (
+                        <td className="px-2 py-4 text-gray-300 cursor-grab active:cursor-grabbing select-none">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm8-16a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+                          </svg>
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-sm text-gray-400">{m.position}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
