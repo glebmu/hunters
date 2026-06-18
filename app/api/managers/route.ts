@@ -55,12 +55,11 @@ export async function PATCH(req: Request) {
 
 export async function PUT(req: Request) {
   const { ids } = await req.json() as { ids: string[] };
-  // Two-pass to avoid unique constraint conflicts during swap
-  for (let i = 0; i < ids.length; i++) {
-    await prisma.manager.update({ where: { id: ids[i] }, data: { position: -(i + 1) } });
-  }
-  for (let i = 0; i < ids.length; i++) {
-    await prisma.manager.update({ where: { id: ids[i] }, data: { position: i + 1 } });
-  }
+  // position is no longer @unique, so updating rows independently is safe.
+  await Promise.all(
+    ids.map((id, i) =>
+      prisma.manager.update({ where: { id }, data: { position: i + 1 } })
+    )
+  );
   return NextResponse.json({ ok: true });
 }

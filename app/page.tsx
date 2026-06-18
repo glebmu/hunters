@@ -94,9 +94,13 @@ export default function Home() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // ── Sync from Google Sheets ────────────────────────────────
+  // ── Sync quotas/deals from Google Sheets (floating "Обновить") ─
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  // ── Sync manager list from Google Sheets ──────────────────
+  const [syncingManagers, setSyncingManagers] = useState(false);
+  const [syncManagersMsg, setSyncManagersMsg] = useState<string | null>(null);
 
   const fetchManagers = useCallback(async (date: string) => {
     setLoading(true);
@@ -143,6 +147,27 @@ export default function Home() {
       setSyncMsg("Нет связи с сервером");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function syncManagersFromSheet() {
+    setSyncingManagers(true);
+    setSyncManagersMsg(null);
+    try {
+      const res = await fetch("/api/managers/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncManagersMsg(`Ошибка: ${data.error ?? "не удалось синхронизировать"}`);
+      } else {
+        const addedTxt = data.added > 0 ? `, добавлено ${data.added}` : "";
+        setSyncManagersMsg(`Готово${addedTxt}`);
+        fetchManagers(selectedDate);
+        setTimeout(() => setSyncManagersMsg(null), 4000);
+      }
+    } catch {
+      setSyncManagersMsg("Нет связи с сервером");
+    } finally {
+      setSyncingManagers(false);
     }
   }
 
@@ -267,11 +292,17 @@ export default function Home() {
     setDraggedId(null);
     setDragOverId(null);
 
-    await fetch("/api/managers", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: newOrder.map((m) => m.id) }),
-    });
+    try {
+      const res = await fetch("/api/managers", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: newOrder.map((m) => m.id) }),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      // Revert optimistic order to server state on failure
+      fetchManagers(selectedDate);
+    }
   }
 
   async function openDeals(manager: Manager) {
@@ -567,12 +598,12 @@ export default function Home() {
             {role === "manager" && (
               <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-3">
                 <button
-                  onClick={syncFromSheet}
-                  disabled={syncing}
+                  onClick={syncManagersFromSheet}
+                  disabled={syncingManagers}
                   className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 disabled:opacity-50 transition-colors"
                 >
                   <svg
-                    className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`}
+                    className={`w-4 h-4 ${syncingManagers ? "animate-spin" : ""}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -580,9 +611,9 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {syncing ? "Синхронизирую..." : "Синхронизировать с Google Sheets"}
+                  {syncingManagers ? "Синхронизирую..." : "Синхронизировать с Google Sheets"}
                 </button>
-                {syncMsg && <span className="text-xs text-gray-400">{syncMsg}</span>}
+                {syncManagersMsg && <span className="text-xs text-gray-400">{syncManagersMsg}</span>}
               </div>
             )}
           </div>
@@ -665,6 +696,33 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Floating "Обновить" button (managers only) ───────── */}
+      {role === "manager" && (
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+          {syncMsg && (
+            <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg max-w-[200px] text-center">
+              {syncMsg}
+            </div>
+          )}
+          <button
+            onClick={syncFromSheet}
+            disabled={syncing}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-3 rounded-full shadow-lg transition-colors"
+          >
+            <svg
+              className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncing ? "Обновляю..." : "Обновить"}
+          </button>
         </div>
       )}
 

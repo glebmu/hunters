@@ -26,7 +26,7 @@ model User {
 model Manager {
   id          String       @id @default(cuid())
   name        String
-  position    Int          @unique
+  position    Int          @default(0)
   isActive    Boolean      @default(true)
   monthlyPlan Int          @default(0)
   users       User[]
